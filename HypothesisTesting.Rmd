@@ -1,0 +1,285 @@
+---
+title: The hypothesis of a ‘core’ community receives poor support when confronted
+  with simulated and empirical data
+output:
+  html_document:
+    df_print: paged
+---
+
+## Maya Gans and Gordon Custer
+## University of Wyoming
+## December 3, 2018
+
+
+# Load Packages
+```{r, results='hide'}
+# load packages
+require(VennDiagram)
+require(limma)
+require(gplots)
+require(tidyverse)
+require(matrixStats)
+require(factoextra)
+require(gridExtra)
+require(mctoolsr)
+require(parallelDist)
+require(dendextend)
+```
+
+
+# Import Data
+```{r, warning = FALSE}
+setwd("/Users/mayagans/Documents/Core-Microbiome-Methods")
+
+# import OTU tables: OTUs as rows, sample replicates as columns
+
+human <- readRDS("human.RDS")
+arabadopsis <- readRDS("arabadopsis.RDS")
+
+# by reassigning the imported dataset to the variable OTU
+# all code below can be easily executed
+
+otu <- arabadopsis
+print(otu[1:4,1:4])
+```
+
+# Data Clean Up
+```{r}
+# Remove all non-numeric data and make OTU IDs into row names
+otu1 <- otu[,-1]
+rownames(otu1) <- otu[,1]
+otu <- otu1
+
+# Get number of sites for the experiment
+# both datasets here are single treatments
+# this will need to be modified if the data includes multiple treatments
+N <- ncol(otu)
+
+# Get the total number of reads for the entire experiment
+# this number would also need to be the total number of reads per treatment
+s <- sum(colSums(otu))
+
+# visualize the distribution of reads
+All_OTUs <- rownames(otu)
+```
+
+
+# Mean, Variance, Covariance
+
+In this section we calculate the mean, variance and CV of each OTU.  This will be used downstream to see if there is correlation between CV/Mean/Variance and the OTUs defined as core.  The end product of this section is a dataframe with the Mean, Variance and CV for each OTU. 
+
+```{r}
+#transpose matrix so we can use the two functions colMeans and colVars
+dat<-as.matrix(t(otu))
+OTU_M_V_CV<-as.data.frame(colMeans(dat))
+OTU_M_V_CV$Mean<-OTU_M_V_CV$`colMeans(dat)`
+OTU_M_V_CV$`colMeans(dat)`= NULL
+OTU_M_V_CV$Variance<-colVars(dat)
+OTU_M_V_CV$CV <- (OTU_M_V_CV$Variance/OTU_M_V_CV$Mean)
+OTU_M_V_CV$OTU<-rownames(OTU_M_V_CV)
+OTU_M_V_CV.2<-OTU_M_V_CV
+OTU_M_V_CV.2$OTU=NULL
+```
+
+# Proportion of replicates method
+
+This method assigns taxa to the core based upon the number of sites it is present in. In this example we assign core membership when the taxa's abundance is atleast 10 fold the number of sites. This method accounts for abundance as a function of sites. 
+```{r}
+abund <-rowSums(otu)
+focaltaxa<-rownames(otu)[abund>10*ncol(otu)]
+```
+
+# Hard cut offs
+
+This method assigns taxa to the core if they are present in more than a pre-determined number of sites and have a total abudance greater than a pre-determined number of reads. In our example we set the minimum number of sites to 5 and the minimum number of reads to 25. Here we use the hard cut off described in Lundberg (2012), but realize this is any threshhold. 
+
+```{r}
+M5_25<- otu
+#M5_25 <- as.data.frame(subset(df5_25, (rowSums(df5_25) >= 25)))
+#from maya
+#sum(rownsums(replicatesSim>=25))>=5)- ncore
+M5_25$numofsites <- apply(M5_25, 1, function(x) sum(x>25))
+M5_25<-as.data.frame(subset(M5_25, M5_25$numofsites >=5))
+M5_25<-as.character(rownames(M5_25))
+length(M5_25)
+```
+
+# Proportion of reads and replicates
+
+This method assigns taxa to the core if they account for some proportion of the total reads for the sequencing run and if they are preseant in atleast x% of the total number of replicates. In this example, a core taxa must account for 0.01% of the total reads for the entire otu table and be present in at least 50% of sites.
+```{r}
+prop <- as.data.frame(subset(otu, (rowSums(otu) >= (s/1000))))
+prop$numofsites <- apply(prop, 1, function(x) sum(x>0))
+prop<-as.data.frame(subset(prop, prop$numofsites >=N*0.5))
+prop<- as.character(rownames(prop))
+```
+
+# Proportion of reads
+This method assigns taxa to the core if they are in the top X% of reads. Taxa are ranked in abudnace and the cumulative sum is recoreded. Any taxa which appears before some cutoff percentage is included in the core. In this example, a taxa will be assigned to the core if they account for the first 75% of the reads
+
+```{r}
+top_75_percent<-as.data.frame(otu)
+top_75_percent$otuappearance<- rowSums(top_75_percent)
+sortedtop_75_percent<-top_75_percent[order(-top_75_percent$otuappearance),]
+sortedtop_75_percent$prop<-sortedtop_75_percent$otuappearance/s
+sortedtop_75_percent$cum_sum<-cumsum(sortedtop_75_percent$prop)
+sortedtop_75_percent<-as.data.frame(subset(sortedtop_75_percent, sortedtop_75_percent$cum_sum <=0.75))
+sortedtop_75_percent<-as.character(rownames(sortedtop_75_percent))
+```
+
+# Combine Methods
+Make a dataframe with all observed taxa, their inclusion to the core by method (deliniated as a 1 or 0), the mean, variance, and coefficient of variation.
+```{r}
+combined_data  <- qpcR:::cbind.na(focaltaxa, prop, sortedtop_75_percent, M5_25, All_OTUs )
+combined_data <- as.data.frame(combined_data)
+rownames(combined_data) <- combined_data$All_OTUs
+
+combined_data2  <- qpcR:::cbind.na(focaltaxa, prop, sortedtop_75_percent, M5_25 )
+combined_data2 <- as.data.frame(combined_data2)
+
+Core_community_Ids<-unique(unlist(combined_data[,]))
+Core_community_Ids<-as.character(Core_community_Ids)
+
+combined_data1<- data.frame(OTU = Core_community_Ids, 
+                            focaltaxa = Core_community_Ids %in% combined_data2$focaltaxa, 
+                            prop = Core_community_Ids %in% combined_data2$prop,  
+                            sortedtop_75_percent = Core_community_Ids %in% combined_data2$sortedtop_75_percent, 
+                            M5_25 = Core_community_Ids %in% combined_data2$M5_25)
+
+
+#convert true false into 1 and 0
+index <- c("TRUE", "FALSE")
+values <- c("1", "0")
+
+combined_data1$focaltaxa<- values[match(combined_data1$focaltaxa, index)]
+combined_data1$prop<- values[match(combined_data1$prop, index)]
+combined_data1$M5_25<- values[match(combined_data1$M5_25, index)]
+combined_data1$sortedtop_75_percent<- values[match(combined_data1$sortedtop_75_percent, index)]
+
+MergedOTU_Stats <- na.omit(left_join(combined_data1, OTU_M_V_CV))
+```
+
+# Make a copy of each dataframe as its produced
+```{#r}
+write.csv(MergedOTU_Stats, "Core_Inclusion_and_Stats_Arabadopsis")
+write.csv(MergedOTU_Stats, "Core_Inclusion_and_Stats_Human")
+write.csv(MergedOTU_Stats, "Core_Inclusion_and_Stats_Simulated")
+```
+
+# Plot
+```{r warning=FALSE}
+# I like log(Mean) scale for Human dataset
+p1 <- ggplot(MergedOTU_Stats, aes(x = log(Mean), y = CV, colour = M5_25, size = 5)) +
+  geom_hex(bins = 30) +
+  scale_fill_gradient(low = "#EAE6f3", high = "#432976") +
+  scale_color_manual(values = c("lightgray", "black")) +
+  theme_bw() +
+  ggtitle("Hard Cutoff") +
+  theme(plot.title = element_text(size=10)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  theme(legend.position="none")
+  
+
+p2 <- ggplot(MergedOTU_Stats, aes(x = log(Mean), y = CV, colour = focaltaxa)) +
+  geom_hex(bins = 30) +
+  scale_fill_gradient(low = "#EAE6f3", high = "#432976") +
+  scale_color_manual(values = c("lightgray", "black")) +
+  theme_bw() +
+  ggtitle("Proportion of Replicates") +
+  theme(plot.title = element_text(size=10)) +
+  theme(legend.position="none") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+  
+
+p3 <- ggplot(MergedOTU_Stats, aes(x = log(Mean), y = CV, colour = prop)) +
+  geom_hex(bins = 30) +
+  scale_fill_gradient(low = "#EAE6f3", high = "#432976") +
+  scale_color_manual(values = c("lightgray", "black")) +
+  theme_bw() +
+  ggtitle("Proportion of Reads & Replicates") +
+  theme(plot.title = element_text(size=10)) +
+  theme(legend.position="none") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+p4 <- ggplot(MergedOTU_Stats, aes(x = log(Mean), y = CV, colour = sortedtop_75_percent)) +
+  geom_hex(bins = 30) +
+  scale_fill_gradient(low = "#EAE6f3", high = "#432976") +
+  scale_color_manual(values = c("lightgray", "black")) +
+  theme_bw() +
+  ggtitle("Proportion of Reads") +
+  theme(plot.title = element_text(size=10)) +
+  theme(legend.position="none") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+grid.arrange(p1,p2,p3,p4, ncol = 2)
+```
+
+# Plot Venn diagram of core membership by methodology
+```{r}
+combined_data1<-na.omit(combined_data1)
+rownames(combined_data1) <- combined_data1[,1]
+combined_data1$OTU = NULL
+combined_data1$focaltaxa<-as.numeric(combined_data1$focaltaxa)
+combined_data1$prop<-as.numeric(combined_data1$prop)
+combined_data1$sortedtop_75_percent<-as.numeric(combined_data1$sortedtop_75_percent)
+combined_data1$M5_25<-as.numeric(combined_data1$M5_25)
+diagramcounts <- vennCounts(combined_data1)
+
+vennDiagram(diagramcounts, circle.col = c("#A76BA3","#608A8C","#F2D24A","#4B4769"), main = "Arabadopsis Endosphere Subset", names = c("Prop. Reps", "Prop. Reps & Reads", "Prop. Reads", "Hard Cutoff"), cex = c(1,1,1)) 
+```
+Each circle represents the OTUs ascribed by that method, and shared with overlapping methods. The outside number is the OTUs within the set that were not included within any method of core membership. 
+
+# Plot dendrogram
+We first need to create a distance matrix on the mean, variance, and covariance dataframe. We can then use this matrix to apply clustering algorithms.
+```{r}
+otu <- as.matrix(OTU_M_V_CV.2)
+# dist<-dist(otu)
+dist = parDist(otu, method="bray")
+hc = hclust(dist, method = "ward.D2")
+hh = hc$height
+k = 1.25; hh.crit = mean(hh)+k*sd(hh)
+groups = cutree(hc,k=2)
+#plot(hc, hang=-1)
+#plot(as.dendrogram(hc), horiz=TRUE)
+#abline(v=hh.crit, lty=2, lwd=2)
+
+
+dend<-as.dendrogram(hc)
+
+MergedOTU_Stats<-na.omit(MergedOTU_Stats)
+new_df <- MergedOTU_Stats[ order(MergedOTU_Stats$OTU), ]
+groupCodes <- as.factor(new_df$sortedtop_75_percent)
+#colorCodes<- ifelse(new_df$sortedtop_75_percent == "1", "red", "black")
+#colorCodes <- c( new_df$focaltaxa, 1 = "red", 0 = "black")
+colorCodes <- c("1"="black", "0"="red")
+labels_colors(dend) <- colorCodes[groupCodes][order.dendrogram(dend)]
+
+# Define nodePar
+nodePar <- list(lab.cex = 0.6, pch = c(NA, 19), cex = 0.7, col = "blue")
+nodePar <- list(pch=16, call=groupCodes)
+
+# Customized plot; remove labels
+#plot(dend, ylab = "Height", nodePar = nodePar, leaflab = "")
+plot(dend)
+```
+Plotting the dendrogram it becomes apparent we have red (assigned to core) OTUs all along the tree diagram rather than grouped in any one branch. If your data were to cluster by mean and variance we see this as grounds for ascribing a core. 
