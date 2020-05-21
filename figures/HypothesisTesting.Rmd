@@ -45,7 +45,28 @@ summarize_OTUS <- function(otu_table) {
 ```
 
 
-# Proportion of replicates method
+# Four Methods for Looking at the Core-Non Core Divide 
+
+### Proportion of reads
+
+This method assigns taxa to the core if they are in the top X% of reads. Taxa are ranked in abudnace and the cumulative sum is recoreded. Any taxa which appears before some cutoff percentage is included in the core. In this example, a taxa will be assigned to the core if they account for the first 75% of the reads
+
+```{r}
+prop_reads <- function(otu_table) {
+  otu_table %>%
+  pivot_longer(-X) %>%
+  group_by(X) %>%
+  summarise(otuappearance = sum(value)) %>%
+  arrange(-otuappearance) %>%
+  mutate(s = sum(otuappearance),
+         prop = otuappearance/s,
+         cumsum = cumsum(prop)) %>%
+  filter(cumsum <= 0.75) %>%
+  pull(X)
+}
+```
+
+### Proportion of replicates method
 
 This method assigns taxa to the core based upon the number of sites it is present in. In this example we assign core membership when the taxa's abundance is atleast 10 fold the number of sites. This method accounts for abundance as a function of sites. 
 
@@ -60,24 +81,7 @@ prop_reps <- function(otu_table) {
 }
 ```
 
-# Hard cut offs
-
-This method assigns taxa to the core if they are present in more than a pre-determined number of sites and have a total abudance greater than a pre-determined number of reads. In our example we set the minimum number of sites to 5 and the minimum number of reads to 25. Here we use the hard cut off described in Lundberg (2012), but realize this is any threshhold. 
-
-```{r}
-hard_cutoff <- function(otu_table) {
-  otu_table %>%
-    pivot_longer(-X) %>%
-    select(-name) %>%
-    filter(value > 25) %>%
-    group_by(X) %>%
-    summarise(count = n()) %>%
-    filter(count >= 5) %>%
-    pull(X)
-}
-```
-
-# Proportion of reads and replicates
+### Proportion of reads and replicates
 
 This method assigns taxa to the core if they account for some proportion of the total reads for the sequencing run and if they are preseant in atleast x% of the total number of replicates. In this example, a core taxa must account for 0.01% of the total reads for the entire otu table and be present in at least 50% of sites.
 
@@ -99,24 +103,23 @@ prop_reads_and_reps <- function(otu_table) {
 }
 ```
 
+### Hard cut offs
 
-# Proportion of reads
-This method assigns taxa to the core if they are in the top X% of reads. Taxa are ranked in abudnace and the cumulative sum is recoreded. Any taxa which appears before some cutoff percentage is included in the core. In this example, a taxa will be assigned to the core if they account for the first 75% of the reads
+This method assigns taxa to the core if they are present in more than a pre-determined number of sites and have a total abudance greater than a pre-determined number of reads. In our example we set the minimum number of sites to 5 and the minimum number of reads to 25. Here we use the hard cut off described in Lundberg (2012), but realize this is any threshhold. 
 
 ```{r}
-prop_reads <- function(otu_table) {
+hard_cutoff <- function(otu_table) {
   otu_table %>%
-  pivot_longer(-X) %>%
-  group_by(X) %>%
-  summarise(otuappearance = sum(value)) %>%
-  arrange(-otuappearance) %>%
-  mutate(s = sum(otuappearance),
-         prop = otuappearance/s,
-         cumsum = cumsum(prop)) %>%
-  filter(cumsum <= 0.75) %>%
-  pull(X)
+    pivot_longer(-X) %>%
+    select(-name) %>%
+    filter(value > 25) %>%
+    group_by(X) %>%
+    summarise(count = n()) %>%
+    filter(count >= 5) %>%
+    pull(X)
 }
 ```
+
 
 # Combine Methods
 
@@ -141,7 +144,7 @@ summarize_OTUS(otu_table) %>%
 
 ```{r}
 combined_arabadopsis <- combine_methods(arabadopsis)
-combined_human <- combine_methods(human)
+combined_human<- combine_methods(human)
 ```
 
 
@@ -154,8 +157,10 @@ write.csv(combined_human, "../data_output/Core_Inclusion_and_Stats_Human")
 
 # Plot
 
+A single plot looking at the 4 different methods of core inclusion.
+
 ```{r}
-combined_plots <- function(combined_otu_data, low, high, legend_title) {
+combined_plots <- function(combined_otu_data, low = "#EAE6f3", high = "#432976", legend_title) {
   combined_otu_data %>%
     ggplot() +
     aes(x = log(Mean), y = CV, color = as.factor(value)) +
@@ -172,5 +177,29 @@ combined_plots <- function(combined_otu_data, low, high, legend_title) {
 
 ```{r}
 combined_plots(combined_arabadopsis, high = "#2D5062", low = "#E6ECF1", legend_title = "Arabidopsis Taxa Count")
-combined_plots(combined_human, low = "#EAE6f3", high = "#432976", legend_title = "HMP Taxa Count")
+```
+
+
+# Figure for Manuscript 
+
+Combine the dataframes to facet together
+
+```{r}
+all_data_combined <- rbind(
+  combined_arabadopsis %>% mutate(Legend = "Arabidopsis Taxa Count"),
+  combined_human %>% mutate(Legend = "HMP Taxa Count")
+)
+
+all_data_combined %>%
+    ggplot() +
+    aes(x = log(Mean), y = CV, color = as.factor(value)) +
+    geom_hex(bins = 30) +
+    theme_bw() +
+    scale_color_manual(values = c("lightgray", "black")) +
+    scale_fill_gradient(low = "#EAE6f3", high = "#432976") +
+    theme_bw() +
+  facet_grid(Legend ~ name) +
+  guides(color = FALSE) + 
+  ylab("Coefficent of Variance") +
+  labs(fill = "Taxa Count")
 ```
