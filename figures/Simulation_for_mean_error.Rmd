@@ -110,7 +110,7 @@ ggplot(sim.df_gg, aes(x = as.factor(corenoncoreratio), y = as.factor(theta))) +
   theme(legend.text=element_text(size=2)) +
   theme_minimal() +
   scale_fill_gradientn(colours = myPalette, values = scales::rescale(c(-25, 0, 100, 500, 1000))) +
-  geom_text(aes(label = round(sim.df_gg$prob, digits = 1))) +
+  geom_text(aes(label = round(prob, digits = 1))) +
    labs(x = expression(paste("(", pi, " core / ", pi, " non-core)")),
        y = expression(paste(theta)),
        fill = "Mean Error") +

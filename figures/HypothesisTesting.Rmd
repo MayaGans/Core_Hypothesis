@@ -190,7 +190,7 @@ all_data_combined <- rbind(
   combined_human %>% mutate(Legend = "HMP Taxa Count")
 )
 
-all_data_combined %>%
+figure_2 <- all_data_combined %>%
     ggplot() +
     aes(x = log(Mean), y = CV, color = as.factor(value)) +
     geom_hex(bins = 30) +
@@ -202,4 +202,6 @@ all_data_combined %>%
   guides(color = FALSE) + 
   ylab("Coefficent of Variance") +
   labs(fill = "Taxa Count")
+
+ggsave(figure_2, "figure_2.png")
 ```
