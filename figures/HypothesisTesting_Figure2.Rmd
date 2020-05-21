@@ -203,5 +203,5 @@ figure_2 <- all_data_combined %>%
   ylab("Coefficent of Variance") +
   labs(fill = "Taxa Count")
 
-ggsave(figure_2, "figure_2.png")
+ggsave("figure2.pdf", figure_2, height = 7, width = 15)
 ```

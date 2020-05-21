@@ -164,41 +164,24 @@ sim.df$PropReadReps_ratio <- sim.df$PropReadReps_TP_num - sim.df$PropReadReps_FP
 ```{r}
 sim.df_all <- sim.df %>%
   gather(method, mean, c(5:8, 9:12, 21:24)) %>%
-  separate(method, into = c('method', 'error'), sep = "_")
-
-unique(sim.df_all$method)
-
-sim.df_all$method <- as.factor(sim.df_all$method)
-sim.df_all$error <- as.factor(sim.df_all$error)
-
-sim.df_all <- sim.df_all %>%
-  mutate(method = factor(method, levels = c("HardCut"  ,    "PropRead"   ,  "PropReps"   ,  "PropReadReps"
-  ), labels = c("Hard Cutoff", "Proportion of Sequence Reads", "Proportion of Replicates", "Proportion of Sequence Reads and Replicates")))
-
-unique(sim.df_all$error)
-# I had the code so that we can split on the underscore, then create this error column for if the values are
-# FP, TF, of TP but I don't think this works given the new names in the column?
-sim.df_all <- sim.df_all %>%
-  mutate(error = factor(error, levels = c("FP", "ratio", "TP"), labels = c("False Positive", "TP-FP", "True Positive")))
-
-# By factoring the methods (ordered factor) we can plot them in the order we want rather than alphabetically
-sim.df_all$method <- factor(sim.df_all$method, 
-                            levels = c("Proportion of Sequence Reads", 
-                                       "Proportion of Replicates", 
-                                       "Proportion of Sequence Reads and Replicates", 
-                                       "Hard Cutoff"))
-
-ggplot(sim.df_all, aes(x = as.factor(corenoncoreratio), y = as.factor(theta))) +
-  geom_tile(aes(fill = mean), colour = "white") +
-  facet_grid(error~method) +
-  theme(legend.text=element_text(size=2)) +
-  theme_minimal() +
-  scale_fill_gradientn(colours = myPalette, values = scales::rescale(c(-0.5, 0, .5, .75, 1))) +
-  geom_text(aes(label = round(sim.df_all$mean, digits = 2))) +
-  labs(x = expression(paste("(", pi, " core / ", pi, " non-core)")),
-       y = expression(paste(theta)),
-       fill = "Mean Error") +
-  theme(strip.text.x = element_text(size = 15))
+  separate(method, into = c('method', 'error'), sep = "_") %>%
+  mutate(error =
+    case_when(
+      error == "TP" ~ "True Positive",
+      error == "FP" ~ "False Positive",
+      error == "ratio" ~ "TP-FP"
+    ) %>%
+      factor(levels = c("True Positive", "False Positive", "TP-FP"))
+  ) %>%
+  mutate(method =
+    case_when(
+      method == "HardCut" ~ "Hard Cutoff",
+      method == "PropRead" ~ "Proportion of Sequence Reads",
+      method == "PropReps" ~ "Proportion of Sequence Replicates",
+      method == "PropReadReps" ~ "Proportion of Sequence Reads and Replicates"
+    ) %>%
+      factor(levels = c("Proportion of Sequence Reads", "Proportion of Replicates", "Proportion of Sequence Reads and Replicates", "Hard Cutoff"))
+  )
 ```
 
 For these plots I just filter the three error values to create each, then facet them together, but this isn't working because of the way the columns were broken up on line 285
@@ -212,7 +195,7 @@ ggplot(tp, aes(x = as.factor(corenoncoreratio), y = as.factor(theta))) +
   theme(legend.text=element_text(size=2)) +
   theme_minimal() +
   scale_fill_gradientn(colours = myPalette2, values = scales::rescale(c(-1000, -500, -25,0, 100, 500, 1000))) +
-  geom_text(aes(label = round(tp$mean, digits = 2))) +
+  geom_text(aes(label = round(mean, digits = 2))) +
    labs(x = expression(paste("(", pi, " core / ", pi, " non-core)")),
        y = expression(paste(theta)),
        fill = "Mean Error") +
@@ -266,7 +249,6 @@ tf_plot <- ggplot(tf, aes(x = as.factor(corenoncoreratio), y = as.factor(theta))
 ```
 
 ```{r}
-g <- cowplot::plot_grid(tp_plot, fp_plot, tf_plot, labels=c("a)", "b)", "c)"), 
-                        ncol = 1, nrow = 3, label_size = 30)
-ggsave(file="Fig1.pdf", g, width = 25, height = 15) #saves g
+g <- (tp_plot + fp_plot + tf_plot + plot_layout(ncol=1))
+ggsave(file="figure1.pdf", g, width = 25, height = 15) #saves g
 ```
