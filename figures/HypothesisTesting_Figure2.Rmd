@@ -89,10 +89,10 @@ This method assigns taxa to the core if they account for some proportion of the 
 prop_reads_and_reps <- function(otu_table) {
   otu_table %>%
     pivot_longer(-X) %>%
-    group_by(X) %>%
-    summarise(rowsum = sum(value)) %>%
-    mutate(s = sum(rowsum)) %>%
-    left_join((otu_table %>% pivot_longer(-X)), by = "X") %>%
+    group_by(X) %>% 
+    mutate(row_sum = sum(value)) %>% 
+    ungroup() %>% 
+    mutate(s = sum(unique(row_sum))) %>%
     filter(value > 0) %>%
     group_by(X) %>%
     summarise(
