@@ -49,7 +49,7 @@ summarize_OTUS <- function(otu_table) {
 
 ### Proportion of reads
 
-This method assigns taxa to the core if they are in the top X% of reads. Taxa are ranked in abudnace and the cumulative sum is recoreded. Any taxa which appears before some cutoff percentage is included in the core. In this example, a taxa will be assigned to the core if they account for the first 75% of the reads
+This method assigns taxa to the core if they are in the top X% of reads. Taxa are ranked in abundance and the cumulative sum is recorded. Any taxa which appears before some cutoff percentage is included in the core. In this example, a taxa will be assigned to the core if they account for the first 75% of the reads
 
 ```{r}
 prop_reads <- function(otu_table) {
@@ -68,7 +68,7 @@ prop_reads <- function(otu_table) {
 
 ### Proportion of replicates method
 
-This method assigns taxa to the core based upon the number of sites it is present in. In this example we assign core membership when the taxa's abundance is atleast 10 fold the number of sites. This method accounts for abundance as a function of sites. 
+This method assigns taxa to the core based upon the number of sites it is present in. In this example we assign core membership when the taxa's abundance is at least 10 fold the number of sites. This method accounts for abundance as a function of sites. 
 
 ```{r}
 prop_reps <- function(otu_table) {
@@ -83,7 +83,7 @@ prop_reps <- function(otu_table) {
 
 ### Proportion of reads and replicates
 
-This method assigns taxa to the core if they account for some proportion of the total reads for the sequencing run and if they are preseant in atleast x% of the total number of replicates. In this example, a core taxa must account for 0.01% of the total reads for the entire otu table and be present in at least 50% of sites.
+This method assigns taxa to the core if they account for some proportion of the total reads for the sequencing run and if they are present in at least x% of the total number of replicates. In this example, a core taxa must account for 0.01% of the total reads for the entire otu table and be present in at least 50% of sites.
 
 ```{r}
 prop_reads_and_reps <- function(otu_table) {
@@ -105,7 +105,7 @@ prop_reads_and_reps <- function(otu_table) {
 
 ### Hard cut offs
 
-This method assigns taxa to the core if they are present in more than a pre-determined number of sites and have a total abudance greater than a pre-determined number of reads. In our example we set the minimum number of sites to 5 and the minimum number of reads to 25. Here we use the hard cut off described in Lundberg (2012), but realize this is any threshhold. 
+This method assigns taxa to the core if they are present in more than a pre-determined number of sites and have a total abidance greater than a pre-determined number of reads. In our example we set the minimum number of sites to 5 and the minimum number of reads to 25. Here we use the hard cut off described in Lundberg (2012), but realize this is any threshold. 
 
 ```{r}
 hard_cutoff <- function(otu_table) {
@@ -123,7 +123,7 @@ hard_cutoff <- function(otu_table) {
 
 # Combine Methods
 
-Make a dataframe with all observed taxa, their inclusion to the core by method (deliniated as a 1 or 0), the mean, variance, and coefficient of variation.
+Make a dataframe with all observed taxa, their inclusion to the core by method (delineated as a 1 or 0), the mean, variance, and coefficient of variation.
 
 ```{r}
 combine_methods <- function(otu_table) {
@@ -137,7 +137,7 @@ summarize_OTUS(otu_table) %>%
     pivot_longer(cols = 5:8) %>%
     mutate(name = factor(name, levels = c("Proportion of Sequence Reads",
                                           "Proportion of Sequence Replicates",
-                                          "Proprortion of Sequence Reads and Replicates",
+                                          "Proportion of Sequence Reads and Replicates",
                                           "Hard Cut Off")))
 }
 ```
@@ -151,7 +151,7 @@ combined_human <- combine_methods(human)
 # Make a copy of each dataframe as its produced
 
 ```{r}
-write.csv(combined_arabadopsis, "../data_output/Core_Inclusion_and_Stats_Arabadopsis")
+write.csv(combined_arabadopsis, "../data_output/Core_Inclusion_and_Stats_Arabidopsis")
 write.csv(combined_human, "../data_output/Core_Inclusion_and_Stats_Human")
 ```
 
@@ -170,7 +170,7 @@ combined_plots <- function(combined_otu_data, low = "#EAE6f3", high = "#432976",
     theme_bw() +
   facet_grid(.~ name) +
   guides(color = FALSE) + 
-  ylab("Coefficent of Variance") +
+  ylab("Coefficient of Variance") +
   labs(fill = legend_title)
 }  
 ```
