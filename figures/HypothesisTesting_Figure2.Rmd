@@ -111,7 +111,7 @@ This method assigns taxa to the core if they are present in more than a pre-dete
 hard_cutoff <- function(otu_table) {
   otu_table %>%
     pivot_longer(-X) %>%
-    select(-name) %>%
+    dplyr::select(-name) %>%
     filter(value > 25) %>%
     group_by(X) %>%
     summarise(count = n()) %>%
@@ -144,7 +144,7 @@ summarize_OTUS(otu_table) %>%
 
 ```{r}
 combined_arabadopsis <- combine_methods(arabadopsis)
-combined_human<- combine_methods(human)
+combined_human <- combine_methods(human)
 ```
 
 
@@ -185,23 +185,16 @@ combined_plots(combined_arabadopsis, high = "#2D5062", low = "#E6ECF1", legend_t
 Combine the dataframes to facet together
 
 ```{r}
-all_data_combined <- rbind(
-  combined_arabadopsis %>% mutate(Legend = "Arabidopsis Taxa Count"),
-  combined_human %>% mutate(Legend = "HMP Taxa Count")
-)
+human_plot <- combined_plots(combined_human, legend_title = "HMP Taxa Count") +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  
+arabadopsis_plot <-combined_plots(combined_arabadopsis, high = "#2D5062", low = "#E6ECF1", legend_title = "Arabidopsis Taxa Count") +
+    theme(strip.background = element_blank(), strip.text.x = element_blank())
 
-figure_2 <- all_data_combined %>%
-    ggplot() +
-    aes(x = log(Mean), y = CV, color = as.factor(value)) +
-    geom_hex(bins = 30) +
-    theme_bw() +
-    scale_color_manual(values = c("lightgray", "black")) +
-    scale_fill_gradient(low = "#EAE6f3", high = "#432976") +
-    theme_bw() +
-  facet_grid(Legend ~ name) +
-  guides(color = FALSE) + 
-  ylab("Coefficent of Variance") +
-  labs(fill = "Taxa Count")
+figure_2 <- (human_plot / arabadopsis_plot + plot_annotation(tag_levels = 'A'))
+
 
 ggsave("figure2.pdf", figure_2, height = 7, width = 15)
 ```
